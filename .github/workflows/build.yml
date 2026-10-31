@@ -1,0 +1,28 @@
+name: Check & Package
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: pip install -r requirements.txt
+      - name: Syntax check
+        run: python -m py_compile app.py
+      - name: Package
+        run: |
+          mkdir -p dist
+          cp app.py requirements.txt README.md dist/
+          cd dist && zip -r ../local-ai-chat.zip .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: local-ai-chat
+          path: local-ai-chat.zip
