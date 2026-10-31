@@ -1,36 +1,33 @@
 # Local AI Chat
 
-تطبيق محادثة ذكاء اصطناعي محلي يعمل **بدون سيرفر**.
+تطبيق محادثة ذكاء اصطناعي **يعمل على الهاتف والكمبيوتر** بدون سيرفر.
 
-## المميزات
-- تبديل بين نماذج مجانية بدون ما يضيع السياق
-- يعمل من جهازك فقط (Ollama محلي + APIs مجانية اختيارية)
+## نسختان
+| المسار | المنصة |
+|--------|--------|
+| `app.py` | كمبيوتر / Termux (Python) |
+| `mobile/` | Android (Flutter) → APK |
+
+## مميزات الهاتف
+- تبديل النماذج بدون ضياع السياق
+- Ollama محلي (لو شغال على نفس الشبكة أو Termux)
+- Groq + OpenRouter مجاني
 - يحفظ المحادثة محلياً
-- يُبنى تلقائياً على GitHub Actions
+- يُبنى APK تلقائي من GitHub Actions
 
-## النماذج المدعومة
-| الاسم | النوع | ملاحظات |
-|-------|-------|---------|
-| ollama / llama3.2 | محلي 100% | يحتاج Ollama مثبت |
-| ollama / phi3 | محلي 100% | خفيف |
-| ollama / gemma2 | محلي 100% | |
-| groq / llama-3.1-8b | مجاني عبر الإنترنت | مفتاح مجاني من groq.com |
-| groq / mixtral-8x7b | مجاني عبر الإنترنت | |
-| openrouter / free | نماذج مجانية متعددة | مفتاح من openrouter.ai |
-
-## التثبيت السريع
+## بناء APK محلياً
 ```bash
-# 1. ثبت Ollama (محلي)
-# https://ollama.com
+cd mobile
+flutter pub get
+flutter build apk --release
+```
+الـ APK: `mobile/build/app/outputs/flutter-apk/app-release.apk`
 
-# 2. سحب نماذج
-ollama pull llama3.2
-ollama pull phi3
+## تحميل APK من GitHub
+Actions → Build Mobile APK → Artifacts → `local-ai-chat-apk`
 
-# 3. شغل التطبيق
+## تشغيل Python (كمبيوتر / Termux)
+```bash
 pip install -r requirements.txt
 python app.py
 ```
-
-## البناء التلقائي
-كل push يشغل workflow يتحقق من الكود.
