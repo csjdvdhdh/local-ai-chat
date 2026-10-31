@@ -3,31 +3,39 @@ name: Build Mobile APK
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'mobile/**'
-      - '.github/workflows/mobile-apk.yml'
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: mobile
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.24.0"
           channel: stable
+          cache: true
+
+      - name: Setup Android local.properties
+        working-directory: mobile
+        run: |
+          echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
+          echo "sdk.dir=$ANDROID_HOME" >> android/local.properties || true
+
       - name: Pub get
+        working-directory: mobile
         run: flutter pub get
+
       - name: Build APK
+        working-directory: mobile
         run: flutter build apk --release
+
       - uses: actions/upload-artifact@v4
         with:
           name: local-ai-chat-apk
