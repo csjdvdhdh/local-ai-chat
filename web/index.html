@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#6C5CE7">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Local AI Chat</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:system-ui,-apple-system,sans-serif;background:#0d0d14;color:#eee;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+header{background:#1a1a24;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #2a2a3a;flex-shrink:0}
+header h1{font-size:16px;font-weight:600}
+header .model{font-size:11px;color:#aaa;margin-top:2px}
+header .btns{display:flex;gap:6px}
+header button{background:#2a2a3a;border:none;color:#eee;width:36px;height:36px;border-radius:10px;font-size:16px}
+#messages{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch}
+.msg{max-width:85%;padding:10px 14px;border-radius:16px;line-height:1.45;font-size:15px;white-space:pre-wrap;word-break:break-word}
+.msg.user{align-self:flex-start;background:#6c5ce7;border-bottom-right-radius:4px}
+.msg.ai{align-self:flex-end;background:#1e1e2a;border-bottom-left-radius:4px}
+.msg.sys{align-self:center;background:transparent;color:#666;font-size:12px}
+#inputbar{padding:10px 12px 16px;background:#1a1a24;border-top:1px solid #2a2a3a;display:flex;gap:8px;flex-shrink:0;padding-bottom:max(16px,env(safe-area-inset-bottom))}
+#inputbar input{flex:1;background:#0d0d14;border:1px solid #333;border-radius:24px;padding:12px 16px;color:#eee;font-size:16px;outline:none}
+#inputbar button{background:#6c5ce7;border:none;color:#fff;width:48px;height:48px;border-radius:50%;font-size:18px;flex-shrink:0}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:50;display:none;align-items:flex-end}
+.sheet.open{display:flex}
+.sheet .panel{background:#1a1a24;width:100%;border-radius:20px 20px 0 0;padding:20px 16px 32px;max-height:80vh;overflow-y:auto}
+.sheet h3{margin-bottom:12px;font-size:16px}
+.sheet .item{padding:14px;border-radius:12px;background:#0d0d14;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.sheet .item.active{outline:2px solid #6c5ce7}
+.sheet input{width:100%;background:#0d0d14;border:1px solid #333;border-radius:10px;padding:12px;color:#eee;margin-bottom:10px;font-size:15px}
+.sheet .save{background:#6c5ce7;border:none;color:#fff;width:100%;padding:14px;border-radius:12px;font-size:16px;margin-top:8px}
+.loading{opacity:.6}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Local AI Chat</h1>
+    <div class="model" id="modelName">Llama 3.2</div>
+  </div>
+  <div class="btns">
+    <button onclick="openModels()" title="نماذج">⇄</button>
+    <button onclick="openSettings()" title="إعدادات">⚙</button>
+    <button onclick="clearChat()" title="مسح">🗑</button>
+  </div>
+</header>
+<div id="messages"></div>
+<div id="inputbar">
+  <input id="inp" placeholder="اكتب رسالة..." enterkeyhint="send" autocomplete="off">
+  <button onclick="send()" id="sendBtn">➤</button>
+</div>
+
+<div class="sheet" id="modelSheet" onclick="if(event.target===this)closeSheets()">
+  <div class="panel">
+    <h3>اختر النموذج (السياق محفوظ)</h3>
+    <div id="modelList"></div>
+  </div>
+</div>
+<div class="sheet" id="settingsSheet" onclick="if(event.target===this)closeSheets()">
+  <div class="panel">
+    <h3>إعدادات</h3>
+    <label style="font-size:13px;color:#aaa">Ollama URL (محلي)</label>
+    <input id="ollamaUrl" placeholder="http://127.0.0.1:11434">
+    <label style="font-size:13px;color:#aaa">GROQ_API_KEY</label>
+    <input id="groqKey" type="password" placeholder="gsk_...">
+    <label style="font-size:13px;color:#aaa">OPENROUTER_API_KEY</label>
+    <input id="orKey" type="password" placeholder="sk-or-...">
+    <button class="save" onclick="saveSettings()">حفظ</button>
+  </div>
+</div>
+
+<script>
+const MODELS = [
+  {id:'ollama-llama', name:'Llama 3.2 (Ollama)', type:'ollama', model:'llama3.2'},
+  {id:'ollama-phi', name:'Phi-3 (Ollama)', type:'ollama', model:'phi3'},
+  {id:'ollama-gemma', name:'Gemma2 (Ollama)', type:'ollama', model:'gemma2'},
+  {id:'groq-llama', name:'Groq Llama-3.1-8B', type:'openai', model:'llama-3.1-8b-instant', key:'groq'},
+  {id:'groq-mixtral', name:'Groq Mixtral', type:'openai', model:'mixtral-8x7b-32768', key:'groq'},
+  {id:'or-auto', name:'OpenRouter Free', type:'openai', model:'openrouter/auto', key:'or', base:'https://openrouter.ai/api/v1'},
+];
+
+let messages = JSON.parse(localStorage.getItem('lai_msgs')||'[]');
+let modelIdx = +localStorage.getItem('lai_model')||0;
+let cfg = JSON.parse(localStorage.getItem('lai_cfg')||'{"ollama":"http://127.0.0.1:11434","groq":"","or":""}');
+
+const $msgs = document.getElementById('messages');
+const $inp = document.getElementById('inp');
+const $name = document.getElementById('modelName');
+
+function save() {
+  localStorage.setItem('lai_msgs', JSON.stringify(messages.slice(-40)));
+  localStorage.setItem('lai_model', modelIdx);
+  localStorage.setItem('lai_cfg', JSON.stringify(cfg));
+}
+function render() {
+  $name.textContent = MODELS[modelIdx].name;
+  $msgs.innerHTML = messages.map(m => 
+    `<div class="msg ${m.role==='user'?'user':m.role==='system'?'sys':'ai'}">${esc(m.content)}</div>`
+  ).join('');
+  $msgs.scrollTop = $msgs.scrollHeight;
+}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+async function callAPI(msgs) {
+  const m = MODELS[modelIdx];
+  if (m.type === 'ollama') {
+    const r = await fetch(cfg.ollama + '/api/chat', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({model:m.model, messages:msgs, stream:false})
+    });
+    if (!r.ok) throw new Error('Ollama ' + r.status);
+    const j = await r.json();
+    return j.message.content;
+  }
+  const key = m.key === 'groq' ? cfg.groq : cfg.or;
+  if (!key) throw new Error('أضف مفتاح ' + (m.key==='groq'?'GROQ':'OpenRouter') + ' من الإعدادات');
+  const base = m.base || 'https://api.groq.com/openai/v1';
+  const headers = {'Authorization':'Bearer '+key, 'Content-Type':'application/json'};
+  if (m.key==='or'){ headers['HTTP-Referer']='https://github.com/csjdvdhdh/local-ai-chat'; headers['X-Title']='Local AI Chat'; }
+  const r = await fetch(base + '/chat/completions', {
+    method:'POST', headers,
+    body: JSON.stringify({model:m.model, messages:msgs, temperature:0.7})
+  });
+  if (!r.ok) throw new Error(r.status + ' ' + await r.text());
+  const j = await r.json();
+  return j.choices[0].message.content;
+}
+
+async function send() {
+  const text = $inp.value.trim();
+  if (!text) return;
+  $inp.value = '';
+  messages.push({role:'user', content:text});
+  if (messages.length > 40) messages = messages.slice(-40);
+  render(); save();
+  const btn = document.getElementById('sendBtn');
+  btn.disabled = true; btn.classList.add('loading');
+  try {
+    const reply = await callAPI(messages.filter(m=>m.role!=='system'));
+    messages.push({role:'assistant', content:reply});
+  } catch(e) {
+    messages.push({role:'assistant', content:'خطأ: '+e.message});
+  }
+  btn.disabled = false; btn.classList.remove('loading');
+  render(); save();
+}
+
+function clearChat(){ messages=[]; save(); render(); }
+function openModels(){
+  const list = document.getElementById('modelList');
+  list.innerHTML = MODELS.map((m,i)=>`
+    <div class="item ${i===modelIdx?'active':''}" onclick="selectModel(${i})">
+      <span>${m.name}</span>
+      <span style="color:#666;font-size:12px">${m.type}</span>
+    </div>`).join('');
+  document.getElementById('modelSheet').classList.add('open');
+}
+function selectModel(i){
+  modelIdx=i; save(); render();
+  closeSheets();
+  messages.push({role:'system', content:'تم التبديل إلى '+MODELS[i].name+' — السياق محفوظ'});
+  render();
+}
+function openSettings(){
+  document.getElementById('ollamaUrl').value = cfg.ollama||'';
+  document.getElementById('groqKey').value = cfg.groq||'';
+  document.getElementById('orKey').value = cfg.or||'';
+  document.getElementById('settingsSheet').classList.add('open');
+}
+function saveSettings(){
+  cfg.ollama = document.getElementById('ollamaUrl').value.trim()||'http://127.0.0.1:11434';
+  cfg.groq = document.getElementById('groqKey').value.trim();
+  cfg.or = document.getElementById('orKey').value.trim();
+  save(); closeSheets();
+}
+function closeSheets(){
+  document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('open'));
+}
+$inp.addEventListener('keydown', e=>{ if(e.key==='Enter') send(); });
+
+// PWA install
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+render();
+</script>
+</body>
+</html>
