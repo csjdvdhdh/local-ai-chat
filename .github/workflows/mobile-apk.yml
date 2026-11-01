@@ -22,21 +22,57 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Setup Android local.properties
+      - name: Create full Flutter project structure
+        working-directory: mobile
+        run: |
+          # ensure icon exists - create minimal adaptive icon via flutter
+          mkdir -p android/app/src/main/res/mipmap-hdpi
+          mkdir -p android/app/src/main/res/mipmap-mdpi
+          mkdir -p android/app/src/main/res/mipmap-xhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+          # generate a simple 1x1 png as placeholder then flutter will handle
+          python3 -c "
+from struct import pack
+import zlib
+def chunk(tag, data):
+    return pack('>I', len(data)) + tag + data + pack('>I', zlib.crc32(tag+data) & 0xffffffff)
+# 48x48 purple png
+w=h=48
+raw=b''
+for y in range(h):
+    raw += b'\\x00'
+    for x in range(w):
+        raw += bytes([0x6c,0x5c,0xe7,0xff])
+png = b'\\x89PNG\\r\\n\\x1a\\n' + chunk(b'IHDR', pack('>IIBBBBB',w,h,8,6,0,0,0)) + chunk(b'IDAT', zlib.compress(raw)) + chunk(b'IEND', b'')
+open('android/app/src/main/res/mipmap-hdpi/ic_launcher.png','wb').write(png)
+open('android/app/src/main/res/mipmap-mdpi/ic_launcher.png','wb').write(png)
+open('android/app/src/main/res/mipmap-xhdpi/ic_launcher.png','wb').write(png)
+open('android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png','wb').write(png)
+open('android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png','wb').write(png)
+print('icons created')
+"
+          # put icon back in manifest
+          sed -i 's/android:usesCleartextTraffic="true">/android:icon="@mipmap\/ic_launcher"\\n        android:usesCleartextTraffic="true">/' android/app/src/main/AndroidManifest.xml || true
+
+      - name: Setup local.properties
         working-directory: mobile
         run: |
           echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
-          echo "sdk.dir=$ANDROID_HOME" >> android/local.properties || true
 
       - name: Pub get
         working-directory: mobile
         run: flutter pub get
 
-      - name: Build APK
+      - name: Build APK (release)
         working-directory: mobile
-        run: flutter build apk --release
+        run: flutter build apk --release --verbose
+
+      - name: List output
+        run: find mobile/build -name "*.apk" -ls || true
 
       - uses: actions/upload-artifact@v4
         with:
           name: local-ai-chat-apk
-          path: mobile/build/app/outputs/flutter-apk/app-release.apk
+          path: mobile/build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
