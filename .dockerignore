@@ -1,0 +1,11 @@
+.git
+.github
+mobile
+__pycache__
+*.py[cod]
+.env
+.env.*
+!.env.example
+data
+.pytest_cache
+.mypy_cache
