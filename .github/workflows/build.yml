@@ -1,9 +1,14 @@
-name: Check & Package
+name: Check & Package Platform
 
 on:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   check:
@@ -12,17 +17,21 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-      - name: Install
+          python-version: "3.12"
+      - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Syntax check
-        run: python -m py_compile app.py
-      - name: Package
+      - name: Compile Python modules
+        run: python -m py_compile server.py app.py
+      - name: Check dashboard JavaScript
+        run: sed -n '/<script>/,/<\/script>/p' web/index.html | sed '1d;$d' > /tmp/dashboard.js && node --check /tmp/dashboard.js
+      - name: Build platform package
         run: |
-          mkdir -p dist
-          cp app.py requirements.txt README.md dist/
-          cd dist && zip -r ../local-ai-chat.zip .
+          mkdir -p dist/web
+          cp server.py app.py requirements.txt README.md Dockerfile .env.example dist/
+          cp RAILWAY_API_REFERENCES.md dist/
+          cp web/index.html web/manifest.json web/sw.js dist/web/
+          cd dist && zip -r ../telegram-bot-platform.zip .
       - uses: actions/upload-artifact@v4
         with:
-          name: local-ai-chat
-          path: local-ai-chat.zip
+          name: telegram-bot-platform
+          path: telegram-bot-platform.zip

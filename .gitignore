@@ -1,0 +1,18 @@
+# Local environments and secrets
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.py[cod]
+
+# Local database and test/build artifacts
+data/
+*.db
+*.sqlite3
+dist/
+.pytest_cache/
+.mypy_cache/
+
+# Node tooling
+node_modules/
